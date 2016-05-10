@@ -1,6 +1,8 @@
 
 # Ultraseq
 
+![](https://travis-ci.org/flow-r/ultraseq.svg?branch=master)
+
 ## Pipelines and the R package are still under active development
 
 The idea is to create a framework addressing some of the following scenarios
