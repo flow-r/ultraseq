@@ -13,7 +13,6 @@ Depends:
     utils,
     assertthat
 Imports:
-    Rsamtools,
     dplyr,
 Suggests:
     testthat
