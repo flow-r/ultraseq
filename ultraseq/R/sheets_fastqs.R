@@ -9,15 +9,25 @@ detect_fq_format2 <- function(x){
   
   if(grepl(".*_([ATGC]*|NoIndex)_L00([0-9]*)_R([0-9]*)_([0-9]*).fastq.gz", basename(x[1]))){
     
-    message("Using CASAVA 1.8 naming format")
+    flog.info("Using CASAVA 1.8 naming format")
     format <- "{{samplename}}_{{index}}_L00{{lane}}_R{{read}}_{{num}}.fastq.gz"
     
   # if any of them as have S1 in their names
   # need a better detection system
   }else if(grepl(".*_S[0-9]*_L00([0-9]*)_R([0-9]*)_([0-9]*).fastq.gz", basename(x[1]))){ 
     # miseq output
-    message("Using MiSeq/bcl2fastq 2.0 naming format")
+    flog.info("Using MiSeq/bcl2fastq 2.0 naming format")
     format <- "{{samplename}}_S[0-9]*_L00{{lane}}_[RI]{{read}}_{{num}}.fastq.gz"
+
+  }else if(grepl(".*_S[0-9]*_L([0-9]*)_R([0-9]*)_([0-9]*).fastq.gz", basename(x[1]))){ 
+    # "1732FL-04-03_S0_L3_R2_001.fastq.gz"
+    flog.info("Using bcl2fastq 3.0?? naming format (L1, instead of L001)")
+    format <- "{{samplename}}_S[0-9]*_L{{lane}}_[RI]{{read}}_{{num}}.fastq.gz"
+  
+    # "SRR8518122_pass_1.fastq.gz"
+   }else if( grepl("SRR[0-9]*_pass_[1-2]{1}.fastq.gz", basename(x[1])) ){ 
+     flog.info("Using SRA PE format")
+     format <- "{{samplename}}_pass_{{read}}.fastq.gz"
 
   }else{
     stop(c("Looks like we could not understand pattern in names of fastq files\n",
@@ -31,23 +41,27 @@ detect_fq_format2 <- function(x){
 #' @param x a fastq file
 #' @param format naming format for the file
 #' @param strict_format_checking TRUE (error)/FALSE(warning)
+#' 
+#' @export
 #'
 split_names_fastq2 <- function(x, 
                                format = "{{samplename}}_{{index}}_L00{{lane}}_R{{read}}_{{num}}.fastq.gz", 
-                               strict_format_checking = FALSE){
+                               # regex pattern for each piece
+                               lst_patterns = list(
+                                 samplename = "(.*)",
+                                 index = "([ATGC]*|NoIndex)",
+                                 lane = "([0-9]*)",
+                                 read = "([1-3]*)", ## ideally would be 1 OR 2 (rarely 3)
+                                 num = "([0-9]*)"),
+                               strict_format_checking = FALSE, 
+                               verbose = T){
   
-  ## --- regex pattern for each piece
-  lst_patterns = list(
-    samplename = "(.*)",
-    index = "([ATGC]*|NoIndex)",
-    lane = "([0-9]*)",
-    read = "([0-9]*)", ## ideally would be 1 OR 2
-    num = "([0-9]*)")
   
-  ## --- replace and get final pattern !
+  # replace and get final pattern !
   tmp = whisker_render(format, lst_patterns)
   fmt = tmp$out
   vars = tmp$vars
+  flog.debug(fmt)
   
   ## get the parse matrix
   repl <- paste("\\",1:length(vars), sep="",collapse=",")
@@ -68,7 +82,7 @@ split_names_fastq2 <- function(x,
   mat <- do.call(rbind, mat)
   mat <- data.frame(mat, x, stringsAsFactors = FALSE)
   
-  # ------------ test if none of the file have the correct pattern ---------------- #
+  # test if none of the file have the correct pattern 
   # if all files were not parsed properly
   # show extra message, to help debug
   #
@@ -91,6 +105,7 @@ split_names_fastq2 <- function(x,
   
   return(mat)
 }
+
 
 #' check_fastq_sheet
 #'
@@ -123,12 +138,7 @@ check_fastq_sheet <- function(x,
   return(x)
 }
 
-
-
-
-options(
-  ngs_fq_ext = "fastq.gz"
-)
+# https://stat.ethz.ch/R-manual/R-devel/library/base/html/regex.html
 
 #' Create a table with details on names of fastq files
 #' @param x path to a fastq folder
@@ -136,21 +146,30 @@ options(
 #' @param format auto detect. Pattern specify pattern acceptable to split_fastq_names. If missing will detect hiseq and miseq
 #' @param strict_format_checking If some file names do not follow the format properly die with error (TRUE), continue with warning (FALSE)
 #' @param sample_prefix A prefix to add to all sample names, run, project etc.....
+#' @param lst_patterns a list of variables to be extracted, along with their regex patterns [typically the default should work for most cases]
 #' 
 #' @export
+#' @import futile.logger
 create_fq_sheet <- function(x,
                             ext = opts_flow$get("fastq_extension"),
                             format = opts_flow$get("fastq_format"),
+                            lst_patterns = list(
+                              samplename = "(.*)",
+                              index = "([ATGC]*|NoIndex)",
+                              lane = "([0-9]*)",
+                              read = "([0-9]*)", 
+                              num = "([0-9]*)"),
                             strict_format_checking = FALSE,
                             sample_prefix = ""){
   
   # get the extension to use
-  if(is.null(ext)) ext = "fastq.gz|fastq"
+  if(is.null(ext)) ext = "fastq.gz$|fastq$"
   if(!grepl("$", ext, fixed = TRUE))
     ext = paste0(ext, "$") ## add a dollar
   
   message("> fetch the files to parse (", ext, ")")
-  fqs <- unlist(lapply(x, list.files, pattern = ext, full.names=TRUE,recursive=TRUE))
+  fqs <- unlist(lapply(x, list.files, pattern = ext, 
+                       full.names=TRUE, recursive=TRUE))
   if(length(fqs) == 0)
     stop("no fastq files found. Please check the folder provided.")
   
@@ -161,7 +180,9 @@ create_fq_sheet <- function(x,
   if(is.null(format))
     format <- detect_fq_format2(fqs)
   
-  fqmat <- split_names_fastq2(fqs, format, strict_format_checking = strict_format_checking)
+  fqmat <- split_names_fastq2(fqs, format, 
+                              strict_format_checking = strict_format_checking, 
+                              lst_patterns = lst_patterns)
   
   # if one needs to change the samplename to include anything in this
   fqmat$samplename = paste0(sample_prefix, fqmat$samplename)
@@ -196,7 +217,8 @@ detect_fq_format <- function(x){
 #' @param format the regex type format to be used to extract information from filenames. See default format as an example.
 #'
 #' @export
-split_names_fastq <- function(files,format="$samplename$_$index$_L00$lane$_R$read$_$num$.fastq.gz"){
+split_names_fastq <- function(files, 
+                              format="$samplename$_$index$_L00$lane$_R$read$_$num$.fastq.gz"){
   ## process format:
   .Deprecated("split_names_fastq2")
   fmt <- gsub("\\$samplename\\$","(.*)",format)

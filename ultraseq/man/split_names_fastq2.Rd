@@ -6,6 +6,8 @@
 \usage{
 split_names_fastq2(x,
   format = "{{samplename}}_{{index}}_L00{{lane}}_R{{read}}_{{num}}.fastq.gz",
+  lst_patterns = list(samplename = "(.*)", index = "([ATGC]*|NoIndex)", lane =
+  "([0-9]*)", read = "([0-9]*)", num = "([0-9]*)"),
   strict_format_checking = FALSE)
 }
 \arguments{

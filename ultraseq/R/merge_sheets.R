@@ -43,5 +43,9 @@ merge_sheets <- function(x, outfile, .filter = NA, ...){
   if(!missing(outfile))
     write_sheet(mrgd, outfile)
   
+    # readr::write_tsv(mrgd, outfile)
+  # although now we can support tsv.gz, csv is not supported any more!
+  # write_sheet(mrgd, outfile)
+  
   invisible(mrgd)
 }

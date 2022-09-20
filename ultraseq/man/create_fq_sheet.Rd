@@ -5,8 +5,9 @@
 \title{Create a table with details on names of fastq files}
 \usage{
 create_fq_sheet(x, ext = opts_flow$get("fastq_extension"),
-  format = opts_flow$get("fastq_format"), strict_format_checking = FALSE,
-  sample_prefix = "")
+  format = opts_flow$get("fastq_format"), lst_patterns = list(samplename =
+  "(.*)", index = "([ATGC]*|NoIndex)", lane = "([0-9]*)", read = "([0-9]*)", num
+  = "([0-9]*)"), strict_format_checking = FALSE, sample_prefix = "")
 }
 \arguments{
 \item{x}{path to a fastq folder}
@@ -14,6 +15,8 @@ create_fq_sheet(x, ext = opts_flow$get("fastq_extension"),
 \item{ext}{extensions to look for. A regex to search for fastq files}
 
 \item{format}{auto detect. Pattern specify pattern acceptable to split_fastq_names. If missing will detect hiseq and miseq}
+
+\item{lst_patterns}{a list of variables to be extracted, along with their regex patterns [typically the default should work for most cases]}
 
 \item{strict_format_checking}{If some file names do not follow the format properly die with error (TRUE), continue with warning (FALSE)}
 

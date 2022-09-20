@@ -129,7 +129,8 @@ if(FALSE){
     normal_bam="inst/testdata/bams/normal.bam",
     paired_name = "tumor_normal", out_prefix="tumor_normal")
   
-  run("../pipelines/bam_mutect", tumor_bam="tumor.bam", 
+  run("../pipelines/bam_mutect", 
+      tumor_bam="tumor.bam", 
       normal_bam="normal.bam",
       paired_name = "tumor_normal",
       execute = FALSE,
